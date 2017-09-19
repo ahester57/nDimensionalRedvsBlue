@@ -29,12 +29,13 @@ var red = '#ff1a1a';
 var blue = '#1affff';
 /************************ Tile Object **************************/
 // For holding tile information
-var Tile = function(i, j) {
-	this.row = i;
-	this.col = j;
+var Tile = function(i,j) {
+	this.indices = [];
+	this.setLocation(new Location([i,j]));
+	// following 3 for drawing
 	this.width = 60;
-	this.x = i * this.width + 30;
-	this.y = j * this.width + 40;
+	this.x = this.row * this.width + 30;
+	this.y = this.col * this.width + 40;
 	this.touches = 0;
 	this.redMarked = false;
 	this.blueMarked = false;
@@ -48,6 +49,19 @@ Tile.prototype.setMarked = function(flag, color) {
 		this.blueMarked = flag;
 	if (flag) 
 		this.touches++;
+}
+// Sets location of tile
+Tile.prototype.setLocation = function(loc) {
+	var ind = loc.getIndices();	// indices of new location
+	for (var i = 0; i < ind.length; i++) {
+		this.indices[i] = ind[i];
+	}
+	this.row = ind[0];
+	this.col = ind[1];
+}
+// Gets location of tile
+Tile.prototype.getLoc = function() {
+	return new Location(this.indices);
 }
 // Sets color of tile
 Tile.prototype.setColor = function(color) {
@@ -66,14 +80,25 @@ var Location = function(loclist) {
 		this.indices.push(loclist[i]);
 	}
 };
+// return specific indices 
 Location.prototype.getIndices = function() {
 	return this.indices;
 }
+// tests if location is the same
 Location.prototype.matches = function(other) {
 	var oloc = other.getIndices();
 	for (var i = 0; i < oloc.length; i++) {
 		if (this.indices[i] != oloc[i])
 			return false;
+	}
+	return true;
+}
+// tests if location is in grid
+Location.prototype.isInGrid = function(gridsize) {
+	for (var i = 0; i < this.indices.length; i++) {
+		if (this.indices[i] < 0 || this.indices[i] >= gridsize) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -110,6 +135,7 @@ Marker.prototype.sendHome = function() {
 }
 /************************ Global Variables *********************/
 var ROWS = 10;	// rows are equal for each axis
+var DIMS = 2; 	// dimensions
 var tiles;
 var redmarker, bluemarker;
 var gameLoop;
@@ -124,24 +150,32 @@ function buildTiles(ndims, rows) {
 		}
 	}
 	return tiles;
+	for (var n = 0; n < ndims; n++) {
+
+	}
+}
+// @TODO 
+function generateHomeLocations(ndims) {
+	//return two arrays
 }
 /************************ Movement Functions *******************/
 // This function is called onClick of the begin button
 // Keeps track of marker location and grid statistics
 function beginMoving() {
 	// initiate all the stuffs
+	var homes = generateHomeLocations(DIMS);
 	redloc = new Location([0, ROWS-1]);
 	blueloc = new Location([ROWS-1, 0]);
 	redmarker = new Marker(redloc, red);
 	bluemarker = new Marker(blueloc, blue);
-	tiles = buildTiles(2,ROWS);
+	tiles = buildTiles(DIMS, ROWS);
 	count = 0;
 	setTileMarker(redmarker);
 	setTileMarker(bluemarker);
 	clearInterval(gameLoop);
 	clearOutput();
 	drawGrid();
-	gameLoop = setInterval(function(){step();}, 0);
+	gameLoop = setInterval(function(){step();}, 10);
 }
 
 // This calculates next movement, tries to move there, and redraws grid
@@ -163,15 +197,12 @@ function step() {
 // tries to move given marker
 function moveMarker(marker) {
 	var loc = getNextLocation(marker);
-	var indices = loc.getIndices();
 	// Make sure new move is inside the grid
-	for (var i = 0; i < indices.length; i++) {
-		if (indices[i] < 0 || indices[i] >= ROWS) {
-			// account for a "no-move move"
-			marker.moves++;
-			setTileMarker(marker);
-			return;
-		}
+	// account for a "no-move move"
+	if (!(loc.isInGrid(ROWS))) {
+		marker.moves++;
+		setTileMarker(marker);
+		return;
 	}
 	marker.setLocation(loc);	// set new marker if inside the grid
 	setTileMarker(marker); // every iteration gives 1 touch to current tile no matter if it tried to move off the grid or 0
@@ -180,7 +211,7 @@ function moveMarker(marker) {
 // sets marked tile
 function setTileMarker(marker)  {	// gonna have to redo this
 	for (var i = 0; i < tiles.length; i++) {
-		if (tiles[i].row == marker.row && tiles[i].col == marker.col) {
+		if (tiles[i].getLoc().matches(marker.getLoc())) {
 			tiles[i].setMarked(true, marker.color);
 			tiles[i].setColor(marker.color);
 		} else {
@@ -190,26 +221,27 @@ function setTileMarker(marker)  {	// gonna have to redo this
 }
 /************************ Testing Function *********************/
 // either does: nothing, sends one home, or ends game
+// why two of the same??? combine.
 function testPoint(marker) {
 	if (marker.moves >= 1000000) {
 		endGame();	// if either is at 100000, rarely if ever happens
 		return;
 	}
 	if (marker.color == red) {
-		if (getTileByLoc(marker.row, marker.col).blueMarked == true) {
+		if (getTileByLoc(marker.getLoc()).blueMarked == true) {
 			// sends home
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "RED sent home @ move: " + marker.moves;
-		} else if (marker.col == 0 && marker.row == ROWS-1) {
+		} else if (marker.getLoc().matches(bluemarker.homeloc)) {
 			endGame();
 			document.getElementById("marker").innerHTML = "RED wins";
 		}
 	} else if (marker.color == blue) {
-		if (getTileByLoc(marker.row, marker.col).redMarked == true) {
+		if (getTileByLoc(marker.getLoc()).redMarked == true) {
 			// sends home
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "BLUE sent home @ move: " + marker.moves;
-		} else if (marker.col == ROWS-1 && marker.row == 0) {
+		} else if (marker.getLoc().matches(redmarker.homeloc)) {
 			endGame();
 			document.getElementById("marker").innerHTML = "BLUE wins";
 		}
@@ -234,8 +266,10 @@ function getNextLocation(marker) {
 }
 // gets tile by coords
 function getTileByLoc(loc) {	// change to take location
+	var tempLoc;
 	for (var i = 0; i < tiles.length; i++) {
-		if (tiles[i].row == row && tiles[i].col == col)
+		tempLoc = tiles[i].getLoc();
+		if (loc.matches(tempLoc))
 			return tiles[i];
 	}
 	return null;
