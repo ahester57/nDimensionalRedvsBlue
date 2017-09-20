@@ -14,6 +14,10 @@
 <body>
 <!-- Start game, keep clicking to play again and again -->
 <button onclick="beginMoving()">Begin Strange Game</button><br/>
+<p id="dims">Dimensions: </p>
+<input id="dimpick" type="number" min="2" max="5">
+<p id="gridsize">Grid size: </p>
+<input id="gridpick" type="number" min="2" max="8">
 <p id="steps">Warning!!! Playing this game may lead to seizures! Continue at your own risk!</p>
 <p id="marker"></p>
 <p id="red">Red starts at bottom-left and wins at top-right.</p>
@@ -29,13 +33,13 @@ var red = '#ff1a1a';
 var blue = '#1affff';
 /************************ Tile Object **************************/
 // For holding tile information
-var Tile = function(i,j) {
+var Tile = function(loc) {
 	this.indices = [];
-	this.setLocation(new Location([i,j]));
+	this.setLocation(loc);
 	// following 3 for drawing
-	this.width = 60;
-	this.x = this.row * this.width + 30;
-	this.y = this.col * this.width + 40;
+	this.width = 80;
+	this.x = this.indices[0] * this.width + 30;
+	this.y = this.indices[1] * this.width + 40;
 	this.touches = 0;
 	this.redMarked = false;
 	this.blueMarked = false;
@@ -56,8 +60,6 @@ Tile.prototype.setLocation = function(loc) {
 	for (var i = 0; i < ind.length; i++) {
 		this.indices[i] = ind[i];
 	}
-	this.row = ind[0];
-	this.col = ind[1];
 }
 // Gets location of tile
 Tile.prototype.getLoc = function() {
@@ -119,8 +121,6 @@ Marker.prototype.setLocation = function(loc) {
 	for (var i = 0; i < ind.length; i++) {
 		this.indices[i] = ind[i];
 	}
-	this.row = ind[0];
-	this.col = ind[1];
 }
 // Gets location of marker
 Marker.prototype.getLoc = function() {
@@ -134,8 +134,8 @@ Marker.prototype.sendHome = function() {
 	setTileMarker(this);
 }
 /************************ Global Variables *********************/
-var ROWS = 10;	// rows are equal for each axis
-var DIMS = 2; 	// dimensions
+var ROWS = 8;	// rows are equal for each axis
+var DIMS = 4; 	// dimensions
 var tiles;
 var redmarker, bluemarker;
 var gameLoop;
@@ -144,28 +144,75 @@ var count;
 // Make new list of tiles
 function buildTiles(ndims, rows) {
 	var tiles = [];
-	for (var i = 0; i < rows; i++) {
-		for (var j = 0; j < rows; j++) {
-			tiles.push(new Tile(i, j));
+	var locs = [];
+
+	var count = rows ** ndims;
+	for (var d = 0; d < count; d++) {
+		// initialize arrays for each possible location at zeros
+		for (var f = 0; f < ndims; f++) {
+			locs[d] = [];
 		}
 	}
+	var pattern = count;
+	for (var d = 0; d < ndims; d++) {
+		// initialize arrays for each possible location at zeros
+		pattern = pattern / rows;
+		buildDimension(pattern, rows, locs);
+	}
+	for (var d = 0; d < count; d++) {
+		tiles.push(new Tile(new Location(locs[d])));
+	}
+	console.log(tiles);
+	// we need a 0, 1, ..., rows-1 in each x, y, z, ...
 	return tiles;
-	for (var n = 0; n < ndims; n++) {
-
+}
+// voodoo magic occurs
+function buildDimension(pattern, rows, locs) {
+	var value;
+	for (var i = 0; i < locs.length; i++) {
+		if (pattern == 1)
+			value = i % rows;
+		else
+			value = Math.floor((i % (pattern * rows)) / pattern);  
+		locs[i].push(value);
 	}
 }
 // @TODO 
 function generateHomeLocations(ndims) {
-	//return two arrays
+	//return array of two arrays
+	var red = [];
+	var blue = [];
+	var top = ROWS - 1;
+	// puts blue at opposite corner of red
+	for (var i = 0; i < ndims; i++) {
+		if (i % 2 == 0) {
+			red.push(0);
+			blue.push(top);
+		} else {
+			red.push(top);
+			blue.push(0);
+		}
+	}
+	return [new Location(red), new Location(blue)];
 }
 /************************ Movement Functions *******************/
 // This function is called onClick of the begin button
 // Keeps track of marker location and grid statistics
 function beginMoving() {
 	// initiate all the stuffs
+	var tdim = document.getElementById("dimpick").value;
+	if (tdim != "") {
+		DIMS = parseInt(tdim);
+	}
+	var trow = document.getElementById("gridpick").value;
+	if (trow != "") {
+		ROWS = parseInt(trow);
+	}
+	document.getElementById("dims").innerHTML = "Dimensions: " + DIMS;
+	document.getElementById("gridsize").innerHTML = "Grid Size: " + ROWS + "x" + ROWS;
 	var homes = generateHomeLocations(DIMS);
-	redloc = new Location([0, ROWS-1]);
-	blueloc = new Location([ROWS-1, 0]);
+	redloc = homes[0];
+	blueloc = homes[1];
 	redmarker = new Marker(redloc, red);
 	bluemarker = new Marker(blueloc, blue);
 	tiles = buildTiles(DIMS, ROWS);
@@ -174,7 +221,8 @@ function beginMoving() {
 	setTileMarker(bluemarker);
 	clearInterval(gameLoop);
 	clearOutput();
-	drawGrid();
+	if (DIMS <= 3)
+		drawGrid();
 	gameLoop = setInterval(function(){step();}, 10);
 }
 
@@ -188,7 +236,8 @@ function step() {
 		var turnmarker = bluemarker;
 	
 	moveMarker(turnmarker);
-	drawGrid();
+	if (DIMS <=3) 
+		drawGrid();
 	document.getElementById("steps").innerHTML = "Total iterations: " + count;
 	// test if over
 	testPoint(turnmarker);
@@ -196,14 +245,15 @@ function step() {
 
 // tries to move given marker
 function moveMarker(marker) {
-	var loc = getNextLocation(marker);
+	var loc = getNextLocation(marker, DIMS);
+	//console.log(loc.getIndices() + marker.color);
 	// Make sure new move is inside the grid
 	// account for a "no-move move"
-	if (!(loc.isInGrid(ROWS))) {
-		marker.moves++;
-		setTileMarker(marker);
-		return;
-	}
+	// if (!(loc.isInGrid(ROWS))) {
+	// 	marker.moves++;
+	// 	setTileMarker(marker);
+	// 	return;
+	// }
 	marker.setLocation(loc);	// set new marker if inside the grid
 	setTileMarker(marker); // every iteration gives 1 touch to current tile no matter if it tried to move off the grid or 0
 }
@@ -227,8 +277,11 @@ function testPoint(marker) {
 		endGame();	// if either is at 100000, rarely if ever happens
 		return;
 	}
+	//console.log(marker.getLoc().matches(new Location(marker.getLoc().getIndices())));
+	var tile = getTileByLoc(marker.getLoc());
 	if (marker.color == red) {
-		if (getTileByLoc(marker.getLoc()).blueMarked == true) {
+		//console.log("red");
+		if (tile.blueMarked == true) {
 			// sends home
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "RED sent home @ move: " + marker.moves;
@@ -237,7 +290,8 @@ function testPoint(marker) {
 			document.getElementById("marker").innerHTML = "RED wins";
 		}
 	} else if (marker.color == blue) {
-		if (getTileByLoc(marker.getLoc()).redMarked == true) {
+		//console.log("blue");
+		if (tile.redMarked == true) {
 			// sends home
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "BLUE sent home @ move: " + marker.moves;
@@ -249,10 +303,11 @@ function testPoint(marker) {
 }
 /************************ getStuff Functions *******************/
 // generate next location of given marker
-function getNextLocation(marker) {
-	var loc = [];
-	var tempMarker = [marker.row, marker.col];
-	var line = Math.floor(Math.random()*2);	// whether traversing row or column
+function getNextLocation(marker, dims) {
+	//console.log(marker.getLoc().getIndices());
+	var ogLoc = marker.getLoc();
+	var tempMarker = marker.getLoc().getIndices();
+	var line = Math.floor(Math.random()*dims);	// whether traversing row or column
 	var N = Math.floor(Math.random()*3);	// either 0, 1, 2
 	// either left/right or up/down depending on Math
 	if (Math.floor(Math.random()*2) == 0) {
@@ -260,18 +315,24 @@ function getNextLocation(marker) {
 	} else {
 		tempMarker[line] -= N;
 	}
-	loc.push(tempMarker[0]);
-	loc.push(tempMarker[1]);
-	return new Location(loc);
+
+	//console.log(tempMarker);
+	var newLoc = new Location(tempMarker);
+	if (newLoc.isInGrid(ROWS)){
+		return newLoc;
+	} else {
+		return ogLoc;
+	}
 }
 // gets tile by coords
 function getTileByLoc(loc) {	// change to take location
 	var tempLoc;
 	for (var i = 0; i < tiles.length; i++) {
-		tempLoc = tiles[i].getLoc();
-		if (loc.matches(tempLoc))
+		if (tiles[i].getLoc().matches(loc))
 			return tiles[i];
 	}
+
+	console.log("is null");
 	return null;
 }
 
@@ -296,7 +357,7 @@ function getMaxTouches() {
 	var array = [];
 	for (var i = 0; i < tiles.length; i++) {
 		if (tiles[i].touches == max)
-			array.push([tiles[i].row, tiles[i].col]);
+			array.push([tiles[i].row, tiles[i].col]);	// redo
 	}
 	result.push(array);	// push list of locations to result
 	return result;	
@@ -315,23 +376,31 @@ function drawGrid() {
 	var p = tiles[0].width / 4;			// padding
 	var bw = ROWS * (tiles[0].width) + p;	// width
 	var bh = ROWS * (tiles[0].width) + p;	// height
+	var tx, ty, twidth;
 
 	context.canvas.width = bh + (p/2 * ROWS + p);	// set canvas size
 	context.canvas.height = bw + (p/2 * ROWS + p);
+	context.globalAlpha = 1.0
 	context.fillStyle = "black";
 	context.fillRect(0, 0, canvas.width, canvas.height);
 	var color;
 	// draw tiles
 	for (var i = 0; i < tiles.length; i++) {
-		context.moveTo(tiles[i].x, tiles[i].y);
-		context.lineTo(tiles[i].x, tiles[i].y + tiles[i].width);
-		context.moveTo(tiles[i].x, tiles[i].y);
-		context.lineTo(tiles[i].x + tiles[i].width, tiles[i].y);
+		tx = tiles[i].x;
+		ty = tiles[i].y;
+		twidth = tiles[i].width;
+		context.moveTo(tx, ty);
+		context.lineTo(tx, ty + twidth);
+		context.moveTo(tx, ty);
+		context.lineTo(tx + twidth, ty);
 	}
 	// complete borders
-	context.moveTo(tiles[0].x + (tiles[0].width * ROWS), tiles[0].y);
-	context.lineTo(tiles[0].x + (tiles[0].width * ROWS), tiles[0].y + (tiles[0].width * ROWS));
-	context.lineTo(tiles[0].x, tiles[0].y + (tiles[0].width * ROWS));
+	tx = tiles[0].x;
+	ty = tiles[0].y;
+	twidth = tiles[0].width;
+	context.moveTo(tx + (twidth * ROWS), ty);
+	context.lineTo(tx + (twidth * ROWS), ty + (twidth * ROWS));
+	context.lineTo(tx, ty + (twidth * ROWS));
 	color = '#' + Math.floor(Math.random()*16777215).toString(16);
 	context.strokeStyle = color;
 	context.lineWidth = 2;
@@ -339,28 +408,42 @@ function drawGrid() {
 
 	// draw circle / touch count
 	for (var i = 0; i < tiles.length; i++) {
+		twidth = tiles[i].width;
+		tx = tiles[i].x;
+		ty = tiles[i].y;
 		if (tiles[i].redMarked) {	// draw marker
-			context.moveTo(tiles[i].x, tiles[i].y);
+			context.moveTo(tx, ty);
 			context.beginPath();
-			context.arc(tiles[i].x + tiles[i].width/2, tiles[i].y + tiles[i].width/2, tiles[i].width/2 - p, 0, 2*Math.PI);
+			context.globalAlpha = 0.8
+			context.arc(tx + twidth/2, ty + twidth/2, twidth/2 - p, 0, 2*Math.PI);
 			context.fillStyle = red;
 			context.fill();
 		} else if (tiles[i].blueMarked) {	// draw marker
-			context.moveTo(tiles[i].x, tiles[i].y);
+			context.moveTo(tx, tiles[i].y);
 			context.beginPath();
-			context.arc(tiles[i].x + tiles[i].width/2, tiles[i].y + tiles[i].width/2, tiles[i].width/2 - p, 0, 2*Math.PI);
+			context.globalAlpha = 0.8
+			context.arc(tx + twidth/2, ty + twidth/2, twidth/2 - p, 0, 2*Math.PI);
 			context.fillStyle = blue;
 			context.fill();
 		} else {	// fill with touches
-			context.moveTo(tiles[i].x, tiles[i].y);
+			context.moveTo(tx, ty);
 			context.beginPath();
-			context.font="bold 22px Georgia";
+			context.globalAlpha = 0.7;
+			context.font="bold 20px Tahoma";
 			//color = '#' + Math.floor(Math.random()*16777215).toString(16);	// for craziness
 			color = "white";
 			//var color = tiles[i].color;
 			context.fillStyle = tiles[i].touches > 0 ? tiles[i].color : color;
-			context.fillText(tiles[i].touches.toString(), tiles[i].x + 10,
-				 tiles[i].y + tiles[i].width - 10);
+			var loc = tiles[i].getLoc().getIndices();
+			var dims = loc.length;
+			
+			if (dims <= 2) {
+				context.fillText(tiles[i].touches.toString(), tx + 10,
+				 	ty + twidth - 10);
+			} else {
+				context.fillText(tiles[i].touches.toString(), tx + 5 + ((loc[dims-1]*2)*(dims**2 % twidth)),
+				 	ty + twidth - 10 - ((loc[dims-1]*2)*(dims**2 % twidth)));
+			}
 		}
 	}
 }
