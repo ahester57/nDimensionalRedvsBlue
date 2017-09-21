@@ -21,6 +21,6 @@ Enter a number of rows: 2-8
 
 See who wins.
 
-Austin Hester\n
-University of Missouri - St. Louis, Computer Science\n
+Austin Hester  
+University of Missouri - St. Louis, Computer Science  
 ahester57@gmail.com
