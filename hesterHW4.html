@@ -8,7 +8,10 @@
 	when red reaches blue's home OR blue reaches red's home.
 	Movement is random.
 	Group:
-    	
+		Roy Ivey
+		Anthony Gianino
+		Austin Hester (me)
+		Matt Rallo
 -->
 </head>
 <body>
@@ -39,7 +42,7 @@ var Tile = function(loc) {
 	// following 3 for drawing
 	this.width = 80;
 	this.x = this.indices[0] * this.width + 30;
-	this.y = this.indices[1] * this.width + 40;
+	this.y = this.indices[1] * this.width + 60;
 	this.touches = 0;
 	this.redMarked = false;
 	this.blueMarked = false;
@@ -145,17 +148,18 @@ var count;
 function buildTiles(ndims, rows) {
 	var tiles = [];
 	var locs = [];
-
 	var count = rows ** ndims;
 	for (var d = 0; d < count; d++) {
-		// initialize arrays for each possible location at zeros
-		for (var f = 0; f < ndims; f++) {
-			locs[d] = [];
-		}
+		// initialize arrays for each possible location
+		locs[d] = [];
 	}
 	var pattern = count;
 	for (var d = 0; d < ndims; d++) {
-		// initialize arrays for each possible location at zeros
+		// build arrays one element at a time for each tile
+		// pattern for 4x4 is 0.0 , 0.1 , 0.2 , 0.3, 1.0 , 1.1 , 1.2 , ....
+		// same for 3d except more iterations
+		// divide pattern by rows for each consecutive dimension
+		// over when pattern is 1 (happens because of math)
 		pattern = pattern / rows;
 		buildDimension(pattern, rows, locs);
 	}
@@ -221,7 +225,7 @@ function beginMoving() {
 	setTileMarker(bluemarker);
 	clearInterval(gameLoop);
 	clearOutput();
-	if (DIMS <= 3)
+	//if (DIMS <= 3)
 		drawGrid();
 	gameLoop = setInterval(function(){step();}, 10);
 }
@@ -236,7 +240,7 @@ function step() {
 		var turnmarker = bluemarker;
 	
 	moveMarker(turnmarker);
-	if (DIMS <=3) 
+	//if (DIMS <=3) 
 		drawGrid();
 	document.getElementById("steps").innerHTML = "Total iterations: " + count;
 	// test if over
@@ -245,15 +249,8 @@ function step() {
 
 // tries to move given marker
 function moveMarker(marker) {
+	// Makes sure new move is inside the grid
 	var loc = getNextLocation(marker, DIMS);
-	//console.log(loc.getIndices() + marker.color);
-	// Make sure new move is inside the grid
-	// account for a "no-move move"
-	// if (!(loc.isInGrid(ROWS))) {
-	// 	marker.moves++;
-	// 	setTileMarker(marker);
-	// 	return;
-	// }
 	marker.setLocation(loc);	// set new marker if inside the grid
 	setTileMarker(marker); // every iteration gives 1 touch to current tile no matter if it tried to move off the grid or 0
 }
@@ -277,8 +274,10 @@ function testPoint(marker) {
 		endGame();	// if either is at 100000, rarely if ever happens
 		return;
 	}
-	//console.log(marker.getLoc().matches(new Location(marker.getLoc().getIndices())));
 	var tile = getTileByLoc(marker.getLoc());
+	if (tile == null) {
+		return;
+	}
 	if (marker.color == red) {
 		//console.log("red");
 		if (tile.blueMarked == true) {
@@ -304,7 +303,6 @@ function testPoint(marker) {
 /************************ getStuff Functions *******************/
 // generate next location of given marker
 function getNextLocation(marker, dims) {
-	//console.log(marker.getLoc().getIndices());
 	var ogLoc = marker.getLoc();
 	var tempMarker = marker.getLoc().getIndices();
 	var line = Math.floor(Math.random()*dims);	// whether traversing row or column
@@ -315,8 +313,7 @@ function getNextLocation(marker, dims) {
 	} else {
 		tempMarker[line] -= N;
 	}
-
-	//console.log(tempMarker);
+	// make new location and test if its in the grid
 	var newLoc = new Location(tempMarker);
 	if (newLoc.isInGrid(ROWS)){
 		return newLoc;
@@ -331,11 +328,8 @@ function getTileByLoc(loc) {	// change to take location
 		if (tiles[i].getLoc().matches(loc))
 			return tiles[i];
 	}
-
-	console.log("is null");
 	return null;
 }
-
 // averages touches
 function getAvgTouches() {
 	var total = 0;
@@ -347,20 +341,12 @@ function getAvgTouches() {
 }
 // gets location(s) of max touches and maximum value
 function getMaxTouches() {
-	var result = [];
 	var max = 0;
 	for (var i = 0; i < tiles.length; i++) {
 		if (tiles[i].touches > max)
 				max = tiles[i].touches;
 	}
-	result.push(max);	// push max count to result
-	var array = [];
-	for (var i = 0; i < tiles.length; i++) {
-		if (tiles[i].touches == max)
-			array.push([tiles[i].row, tiles[i].col]);	// redo
-	}
-	result.push(array);	// push list of locations to result
-	return result;	
+	return max;	
 }
 /************************ End It Function **********************/
 //ends game
@@ -458,7 +444,7 @@ function displayOutput() {
 	document.getElementById("red").innerHTML = "Red: " + redmarker.moves + " moves." + " Sent home " + redmarker.gotSentHome + " times.";
 	document.getElementById("blue").innerHTML = "Blue: " + bluemarker.moves + " moves." + " Sent home " + bluemarker.gotSentHome + " times.";
 	var maxx = getMaxTouches();
-	document.getElementById("max").innerHTML = "Maximum touches: " + maxx[0] + " at: " + maxx[1].join(" | ");
+	document.getElementById("max").innerHTML = "Maximum touches: " + maxx;
 	document.getElementById("average").innerHTML = "Average touches: " + getAvgTouches();
 }
 // clears information when starting new game
