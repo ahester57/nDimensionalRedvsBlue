@@ -13,27 +13,62 @@
 		Austin Hester (me)
 		Matt Rallo
 -->
+<style>
+	th {
+		text-align: left;
+	}
+</style>
 </head>
 <body>
 <!-- Start game, keep clicking to play again and again -->
-<button onclick="beginMoving()">Begin Strange Game</button><br/>
+<h3>N-Dimensional Red vs. Blue</h3>
+<hr>
+<div id="chart_div"></div>
+<hr>
+<table id="table" style="width:65%">
+	<tr>
+		<th>Dimensions</th>
+		<th>Grid Size</th>
+		<th>Winner</th>	
+		<th>Moves Required</th>	
+	</tr>
+</table>
+<hr>
 <p id="dims">Dimensions: </p>
-<input id="dimpick" type="number" min="2" max="5">
+<input id="dimpick" type="number" min="1" max="5">
 <p id="gridsize">Grid size: </p>
-<input id="gridpick" type="number" min="2" max="8">
-<p id="steps">Warning!!! Playing this game may lead to seizures! Continue at your own risk!</p>
+<input id="gridpick" type="number" min="2" max="8"></p>
+<div>
+	<input type="checkbox" id="checkcustom" name="custom" value="off">
+	<label for="checkcustom">Use custom dimesions and grid size?</label>
+</div><hr>
+<button onclick="beginMoving()">Begin Strange Game</button><br/>
+<p id="steps">Warning Playing this game may lead to seizures! Continue at your own risk!</p>
+<canvas id="myCanvas" width="0" height="0" style="border:1px solid #c3c3c3;">
+Your browser does not support the HTML5 canvas tag.
+</canvas>
 <p id="marker"></p>
 <p id="red">Red starts at bottom-left and wins at top-right.</p>
 <p id="blue">Blue starts at top-right and wins at bottom-left.</p>
 <p id="max">Pick a color and hopefully you will win.</p>
 <p id="average">Good luck, you'll need it.</p>
-<canvas id="myCanvas" width="200" height="200" style="border:1px solid #c3c3c3;">
-Your browser does not support the HTML5 canvas tag.
-</canvas>
+<hr>
 
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
+	// load your charts
+google.charts.load('current', {'packages':['corechart']});
+google.charts.setOnLoadCallback(initChart);
 var red = '#ff1a1a';
 var blue = '#1affff';
+/************************ Data Object **************************/
+var Entry = function(dims, rows, winner, moves) {
+	this.dims = dims;
+	this.rows = rows;
+	this.winner = winner;
+	this.moves = moves;
+};
 /************************ Tile Object **************************/
 // For holding tile information
 var Tile = function(loc) {
@@ -137,12 +172,15 @@ Marker.prototype.sendHome = function() {
 	setTileMarker(this);
 }
 /************************ Global Variables *********************/
-var ROWS = 8;	// rows are equal for each axis
-var DIMS = 4; 	// dimensions
+var ROWS = 4;	// rows are equal for each axis
+var DIMS = 3; 	// dimensions
+var RUNS = 50;
 var tiles;
 var redmarker, bluemarker;
 var gameLoop;
 var count;
+var winner;
+var chartdata;
 /************************ Build the tiles *********************/
 // Make new list of tiles
 function buildTiles(ndims, rows) {
@@ -162,6 +200,11 @@ function buildTiles(ndims, rows) {
 		// over when pattern is 1 (happens because of math)
 		pattern = pattern / rows;
 		buildDimension(pattern, rows, locs);
+	}
+	if (ndims == 1) {
+		for (var d = 0; d < count; d++) {
+			locs[d].push(0);
+		}
 	}
 	for (var d = 0; d < count; d++) {
 		tiles.push(new Tile(new Location(locs[d])));
@@ -202,16 +245,28 @@ function generateHomeLocations(ndims) {
 /************************ Movement Functions *******************/
 // This function is called onClick of the begin button
 // Keeps track of marker location and grid statistics
+var tracker = 0;
 function beginMoving() {
 	// initiate all the stuffs
-	var tdim = document.getElementById("dimpick").value;
-	if (tdim != "") {
-		DIMS = parseInt(tdim);
+	var custom = document.getElementById("checkcustom").checked;
+	console.log(custom);
+	if (!custom) {
+		// not a custom run
+	
+		DIMS = Math.floor((tracker+10) /  Math.floor(RUNS / 5));
+	} else {
+		// a custom run
+		var tdim = document.getElementById("dimpick").value;
+		if (tdim != "") {
+			DIMS = parseInt(tdim);
+		}
+		var trow = document.getElementById("gridpick").value;
+		if (trow != "") {
+			ROWS = parseInt(trow);
+		}
+		tracker = RUNS;
 	}
-	var trow = document.getElementById("gridpick").value;
-	if (trow != "") {
-		ROWS = parseInt(trow);
-	}
+
 	document.getElementById("dims").innerHTML = "Dimensions: " + DIMS;
 	document.getElementById("gridsize").innerHTML = "Grid Size: " + ROWS + "x" + ROWS;
 	var homes = generateHomeLocations(DIMS);
@@ -225,9 +280,14 @@ function beginMoving() {
 	setTileMarker(bluemarker);
 	clearInterval(gameLoop);
 	clearOutput();
-	//if (DIMS <= 3)
-		drawGrid();
-	gameLoop = setInterval(function(){step();}, 10);
+
+	// if (DIMS <= 3)
+	// 	drawGrid();
+	// else
+	// 	closeGrid();
+	//tracker = 1;
+	gameLoop = setInterval(function(){step();}, 0);
+
 }
 
 // This calculates next movement, tries to move there, and redraws grid
@@ -240,9 +300,9 @@ function step() {
 		var turnmarker = bluemarker;
 	
 	moveMarker(turnmarker);
-	//if (DIMS <=3) 
-		drawGrid();
-	document.getElementById("steps").innerHTML = "Total iterations: " + count;
+	// if (DIMS <=3) 
+	// 	drawGrid();
+	//document.getElementById("steps").innerHTML = "Total iterations: " + count;
 	// test if over
 	testPoint(turnmarker);
 }
@@ -285,6 +345,7 @@ function testPoint(marker) {
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "RED sent home @ move: " + marker.moves;
 		} else if (marker.getLoc().matches(bluemarker.homeloc)) {
+			winner = "Red";
 			endGame();
 			document.getElementById("marker").innerHTML = "RED wins";
 		}
@@ -295,6 +356,7 @@ function testPoint(marker) {
 			marker.sendHome();
 			document.getElementById("marker").innerHTML = "BLUE sent home @ move: " + marker.moves;
 		} else if (marker.getLoc().matches(redmarker.homeloc)) {
+			winner = "Blue";
 			endGame();
 			document.getElementById("marker").innerHTML = "BLUE wins";
 		}
@@ -353,8 +415,43 @@ function getMaxTouches() {
 function endGame() {
 	clearInterval(gameLoop);
 	displayOutput();
+	chartdata.addRows([[DIMS, redmarker.moves]]);
+	drawChart();
+
+	tracker++;
+	if (tracker < 50)
+		beginMoving();
+	else
+		tracker = 0;
 }
 /************************ Draw Function ************************/
+// initialize chart stuff
+function initChart() {
+	console.log('chart_init');
+	chartdata = new google.visualization.DataTable();
+	chartdata.addColumn('number', 'Dimensions');
+	chartdata.addColumn('number', 'Moves to Win');
+}
+// draw the chart
+function drawChart() {
+	var options = {
+		'title': 'Dimensions vs. Moves to Win',
+		'width': 800,
+		'height': 500,
+		'hAxis': {'title': 'Dimensions', 'minValue': 0},
+		'vAxis': {'title': 'Moves to Win', 'minValue': 0},
+		'legend': 'none'
+	};
+	var chart = new google.visualization.ScatterChart(document.getElementById("chart_div"));
+	chart.draw(chartdata, options);
+}
+// closes canvas for 4D+ simulations
+function closeGrid() {
+	var canvas = document.getElementById("myCanvas");
+	var context = canvas.getContext("2d");
+	context.canvas.width = 0;	// set canvas size
+	context.canvas.height = 0;
+}
 // draw grid, marker, and touches
 function drawGrid() {
 	var canvas = document.getElementById("myCanvas");
@@ -446,6 +543,9 @@ function displayOutput() {
 	var maxx = getMaxTouches();
 	document.getElementById("max").innerHTML = "Maximum touches: " + maxx;
 	document.getElementById("average").innerHTML = "Average touches: " + getAvgTouches();
+	var curTable = document.getElementById("table").innerHTML;
+	var newRow = "<tr><td>" + DIMS + "</td><td>" + ROWS +"</td><td>" + winner + "</td><td>" + redmarker.moves + "</td></tr>";
+	document.getElementById("table").innerHTML = curTable + newRow;
 }
 // clears information when starting new game
 function clearOutput() {
