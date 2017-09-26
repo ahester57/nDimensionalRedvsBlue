@@ -25,15 +25,7 @@
 <hr>
 <div id="chart_div"></div>
 <hr>
-<table id="table" style="width:65%">
-	<tr>
-		<th>Dimensions</th>
-		<th>Grid Size</th>
-		<th>Winner</th>	
-		<th>Moves Required</th>	
-	</tr>
-</table>
-<hr>
+<button onclick="beginMoving()">Begin Strange Game</button><br/>
 <p id="dims">Dimensions: </p>
 <input id="dimpick" type="number" min="1" max="5">
 <p id="gridsize">Grid size: </p>
@@ -41,8 +33,8 @@
 <div>
 	<input type="checkbox" id="checkcustom" name="custom" value="off">
 	<label for="checkcustom">Use custom dimesions and grid size?</label>
-</div><hr>
-<button onclick="beginMoving()">Begin Strange Game</button><br/>
+</div>
+<hr>
 <p id="steps">Warning Playing this game may lead to seizures! Continue at your own risk!</p>
 <canvas id="myCanvas" width="0" height="0" style="border:1px solid #c3c3c3;">
 Your browser does not support the HTML5 canvas tag.
@@ -53,8 +45,15 @@ Your browser does not support the HTML5 canvas tag.
 <p id="max">Pick a color and hopefully you will win.</p>
 <p id="average">Good luck, you'll need it.</p>
 <hr>
-
-
+<table id="table" style="width:65%">
+	<tr>
+		<th>Dimensions</th>
+		<th>Grid Size</th>
+		<th>Winner</th>	
+		<th>Moves Required</th>	
+	</tr>
+</table>
+<hr>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
 	// load your charts
@@ -62,13 +61,6 @@ google.charts.load('current', {'packages':['corechart']});
 google.charts.setOnLoadCallback(initChart);
 var red = '#ff1a1a';
 var blue = '#1affff';
-/************************ Data Object **************************/
-var Entry = function(dims, rows, winner, moves) {
-	this.dims = dims;
-	this.rows = rows;
-	this.winner = winner;
-	this.moves = moves;
-};
 /************************ Tile Object **************************/
 // For holding tile information
 var Tile = function(loc) {
@@ -224,7 +216,7 @@ function buildDimension(pattern, rows, locs) {
 		locs[i].push(value);
 	}
 }
-// @TODO 
+// generates opposing home locations
 function generateHomeLocations(ndims) {
 	//return array of two arrays
 	var red = [];
@@ -246,13 +238,18 @@ function generateHomeLocations(ndims) {
 // This function is called onClick of the begin button
 // Keeps track of marker location and grid statistics
 var tracker = 0;
+var custom;
+var gameover;
+// each not custom simulation runs for 50 times, 10 for each dimension
+// data stacks, so you can run n simulations and get 50*n data points
 function beginMoving() {
+	gameover = false;
 	// initiate all the stuffs
-	var custom = document.getElementById("checkcustom").checked;
+	custom = document.getElementById("checkcustom").checked;
 	console.log(custom);
 	if (!custom) {
 		// not a custom run
-	
+		//ROWS = 4;
 		DIMS = Math.floor((tracker+10) /  Math.floor(RUNS / 5));
 	} else {
 		// a custom run
@@ -266,7 +263,6 @@ function beginMoving() {
 		}
 		tracker = RUNS;
 	}
-
 	document.getElementById("dims").innerHTML = "Dimensions: " + DIMS;
 	document.getElementById("gridsize").innerHTML = "Grid Size: " + ROWS + "x" + ROWS;
 	var homes = generateHomeLocations(DIMS);
@@ -281,13 +277,18 @@ function beginMoving() {
 	clearInterval(gameLoop);
 	clearOutput();
 
-	// if (DIMS <= 3)
-	// 	drawGrid();
-	// else
-	// 	closeGrid();
+	if (custom)
+		drawGrid();
+	else
+	 	closeGrid();
 	//tracker = 1;
-	gameLoop = setInterval(function(){step();}, 0);
-
+	if (custom)
+		gameLoop = setInterval(function(){step();}, 0);
+	else {
+		while (!gameover) {
+			step();
+		}
+	}
 }
 
 // This calculates next movement, tries to move there, and redraws grid
@@ -300,9 +301,9 @@ function step() {
 		var turnmarker = bluemarker;
 	
 	moveMarker(turnmarker);
-	// if (DIMS <=3) 
-	// 	drawGrid();
-	//document.getElementById("steps").innerHTML = "Total iterations: " + count;
+	if (custom) 
+	 	drawGrid();
+	document.getElementById("steps").innerHTML = "Total iterations: " + count;
 	// test if over
 	testPoint(turnmarker);
 }
@@ -413,13 +414,15 @@ function getMaxTouches() {
 /************************ End It Function **********************/
 //ends game
 function endGame() {
-	clearInterval(gameLoop);
 	displayOutput();
 	chartdata.addRows([[DIMS, redmarker.moves]]);
 	drawChart();
-
+	if (custom) {
+		clearInterval(gameLoop);
+	} else
+		gameover = true;
 	tracker++;
-	if (tracker < 50)
+	if (tracker < RUNS)
 		beginMoving();
 	else
 		tracker = 0;
@@ -436,8 +439,8 @@ function initChart() {
 function drawChart() {
 	var options = {
 		'title': 'Dimensions vs. Moves to Win',
-		'width': 800,
-		'height': 500,
+		'width': 1200,
+		'height': 800,
 		'hAxis': {'title': 'Dimensions', 'minValue': 0},
 		'vAxis': {'title': 'Moves to Win', 'minValue': 0},
 		'legend': 'none'
