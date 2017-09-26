@@ -240,8 +240,8 @@ function beginMoving() {
 	}
 	// make sure good values
 	if ((ROWS<2 || ROWS>10) || (DIMS<1 || DIMS>10) || (ROWS==2 && DIMS==1) || (RUNS<1 || RUNS>500)) {
-		closeGrid();
 		clearInterval(gameLoop);
+		closeGrid();
 		alert("You can't do that.")
 		return;
 	}
