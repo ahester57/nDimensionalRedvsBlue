@@ -22,6 +22,7 @@
 <body>
 <!-- Start game, keep clicking to play again and again -->
 <h3>N-Dimensional Red vs. Blue</h3>
+<a href="https://github.com/ahester57/nDimensionalRedvsBlue">GitHub README</a>
 <hr>
 <div id="chart_div"></div>
 <hr>
@@ -250,7 +251,7 @@ function beginMoving() {
 	if (!custom) {
 		// not a custom run
 		//ROWS = 4;
-		DIMS = Math.floor((tracker+10) /  Math.floor(RUNS / 5));
+		DIMS = Math.floor((tracker) /  Math.floor(RUNS / 5)) + 1;
 	} else {
 		// a custom run
 		var tdim = document.getElementById("dimpick").value;
@@ -439,7 +440,7 @@ function initChart() {
 function drawChart() {
 	var options = {
 		'title': 'Dimensions vs. Moves to Win',
-		'width': 1200,
+		'width': 1000,
 		'height': 800,
 		'hAxis': {'title': 'Dimensions', 'minValue': 0},
 		'vAxis': {'title': 'Moves to Win', 'minValue': 0},
