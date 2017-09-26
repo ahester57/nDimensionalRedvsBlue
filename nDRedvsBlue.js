@@ -217,6 +217,7 @@ function beginMoving() {
 	if (!custom) {
 		// not a custom run
 		ROWS = 4;
+		RUNS = 50;
 		animate = false;
 		DIMS = Math.floor((tracker) /  Math.floor(RUNS / 5)) + 1;
 	} else {
